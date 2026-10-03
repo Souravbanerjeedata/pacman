@@ -8,7 +8,8 @@
 
   // Map legend:
   // X = wall, . = pellet, o = power pellet, space = empty corridor
-  // P = pacman, R/P/B/O = ghosts (Blinky/Pinky/Inky/Clyde)
+  // P = Pac-Man, R/K/B/O = ghosts (Blinky/Pinky/Inky/Clyde).
+  // K is used for Pinky because P is already reserved for Pac-Man.
   // T = tunnel (wrap)
   // Ghost house is open horizontally so ghosts can leave immediately
   const MAP = [
@@ -21,7 +22,7 @@
     "XXXX.XXX.X.XXX.XXXX",
     "   X.X       X.X   ",
     "XXXX.X.XX XX.X.XXXX",
-    "T     R B P O     T",
+    "T     R B K O     T",
     "XXXX.X.XXXXX.X.XXXX",
     "   X.X       X.X   ",
     "XXXX.X.XXXXX.X.XXXX",
@@ -132,12 +133,12 @@
           powerPellets.push({ c, r, x, y });
         } else if (ch === "P") {
           pacman = createActor(c, r, "L");
-        } else if ("RPBO".includes(ch)) {
+        } else if ("RKBO".includes(ch)) {
           // Start facing outward so they leave the house immediately
           const startDir = c < 9 ? "L" : "R";
           const g = createActor(c, r, startDir);
-          g.type = ch;
-          g.color = GHOST_COLORS[ch];
+          g.type = ch === "K" ? "P" : ch;
+          g.color = GHOST_COLORS[g.type];
           g.scared = false;
           g.eaten = false;
           g.home = { c, r };
@@ -421,6 +422,13 @@
   // ─── Movement ────────────────────────────────────────────────
   function tryTurn(actor, dir) {
     if (!dir || !canMove(actor, dir)) return false;
+    // AI checks turns on every frame near a tile center. If it keeps the
+    // current direction, leave the actor's fractional position alone or it
+    // will be snapped back to center every frame and appear frozen.
+    if (actor.dir === dir) {
+      actor.nextDir = null;
+      return true;
+    }
     const cx = Math.round(actor.c);
     const cy = Math.round(actor.r);
     const dist = Math.abs(actor.c - cx) + Math.abs(actor.r - cy);
