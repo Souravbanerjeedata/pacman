@@ -1,5 +1,7 @@
 # Neon Pac-Man
 
+![preview]("./preview.png")
+
 A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaScript (HTML5 Canvas).
 
 **No external image assets required** — everything is drawn on canvas.
@@ -8,7 +10,7 @@ A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaSc
 
 ## Play
 
-Open `index.html` in any modern browser, or host the folder on GitHub Pages.
+![play here](https://souravbanerjeedata.github.io/pacman/)
 
 ---
 
