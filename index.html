@@ -45,12 +45,16 @@
       </header>
 
       <div class="board-wrapper">
-        <canvas id="board"></canvas>
+        <canvas
+          id="board"
+          role="img"
+          aria-label="Pac-Man maze. Use arrow keys, WASD, or swipe to move."
+        ></canvas>
       </div>
 
       <footer>
         <div class="footer-sub desktop-only">
-          Arrow keys / WASD to move • SPACE to restart
+          Arrows / WASD move • SPACE starts or retries
         </div>
         <div class="footer-sub mobile-only">Swipe to move</div>
       </footer>
@@ -61,12 +65,15 @@
       <div class="modal-content">
         <h2 class="modal-title">NEON<span>&nbsp;PAC-MAN</span></h2>
         <p class="modal-text">
-          Eat all pellets. Avoid ghosts.<br />Power pellets let you eat them.
+          Eat every dot to clear the maze. Avoid the ghosts; a power pellet lets
+          you eat them for bonus points.
         </p>
         <div class="modal-buttons">
           <button class="modal-btn start-btn" id="startBtn">START</button>
         </div>
-        <p class="modal-hint desktop-only">Arrow keys or WASD to control</p>
+        <p class="modal-hint desktop-only">
+          Move with the arrow keys or WASD · Space starts or retries
+        </p>
         <p class="modal-hint mobile-only">Swipe in any direction to move</p>
       </div>
     </div>

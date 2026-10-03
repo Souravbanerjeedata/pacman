@@ -16,9 +16,9 @@ Open `index.html` in any modern browser, or host the folder on GitHub Pages.
 
 - **Neon visual design** — glowing walls, pulsing power pellets, neon Pac-Man & ghosts
 - **Power pellets** — eat ghosts for bonus points (chain multiplier)
-- **Tunnel wrap** — exit left/right and appear on the other side
+- **Tunnel wrap** — use the marked center tunnel to appear on the other side
 - **Smart-ish ghost AI** — chase when normal, flee when scared, return home when eaten
-- **Lives system** (3) + level progression
+- **Lives system** (3) + level progression; collected pellets stay collected after losing a life
 - **Score** — pellets, power pellets, eaten ghosts, level clear bonus
 - **Mouth animation** & scared-ghost blinking near end of power mode
 - **Mobile-friendly** — swipe to move
@@ -55,7 +55,7 @@ Open `index.html` in any modern browser, or host the folder on GitHub Pages.
 | 4th               | 1600              |
 | Level clear       | 500 × (level − 1) |
 
-Ghosts get faster and power mode gets shorter as levels increase.
+Levels reuse this maze. Ghost speed rises through the first 13 levels, while power-pellet time decreases to a four-second minimum. The level transition pauses movement and advances the maze only once before the next round begins.
 
 ---
 

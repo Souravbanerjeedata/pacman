@@ -79,6 +79,7 @@
   let level = 1;
   let isPlaying = false;
   let gameOver = false;
+  let isLevelTransitioning = false;
   let powerMode = false;
   let powerTimer = 0;
   let ghostEatScore = 200;
@@ -88,10 +89,21 @@
 
   // ─── Helpers ─────────────────────────────────────────────────
   function scaleTile() {
+    const container = document.querySelector(".container");
+    const containerStyle = getComputedStyle(container);
+    const verticalPadding =
+      parseFloat(containerStyle.paddingTop) + parseFloat(containerStyle.paddingBottom);
+    const gap = parseFloat(containerStyle.rowGap) || 0;
+    const otherContentHeight = [...container.children]
+      .filter((child) => !child.classList.contains("board-wrapper"))
+      .reduce((height, child) => height + child.getBoundingClientRect().height, 0);
     const maxW = Math.min(window.innerWidth - 40, 620);
-    const maxH = window.innerHeight - 220;
+    const maxH = Math.max(
+      ROWS * 8,
+      window.innerHeight - otherContentHeight - gap * 3 - verticalPadding - 16
+    );
     TILE = Math.floor(Math.min(maxW / COLS, maxH / ROWS));
-    TILE = Math.max(16, Math.min(TILE, 32));
+    TILE = Math.max(8, Math.min(TILE, 32));
     canvas.width = COLS * TILE;
     canvas.height = ROWS * TILE;
   }
@@ -142,7 +154,7 @@
 
   function isWall(c, r) {
     if (r < 0 || r >= ROWS) return true;
-    if (c < 0 || c >= COLS) return false; // tunnel
+    if (c < 0 || c >= COLS) return r !== 9; // wrap only through the marked tunnel row
     return MAP[r][c] === "X";
   }
 
@@ -160,10 +172,10 @@
 
   // ─── Neon drawing ────────────────────────────────────────────
   function drawBackground() {
-    ctx.fillStyle = "#06061a";
+    ctx.fillStyle = "#0a0a18";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = "rgba(0, 212, 255, 0.04)";
+    ctx.strokeStyle = "rgba(0, 255, 157, 0.04)";
     ctx.lineWidth = 1;
     for (let c = 0; c <= COLS; c++) {
       ctx.beginPath();
@@ -201,7 +213,7 @@
       // Glow stroke
       ctx.shadowColor = "#00d4ff";
       ctx.shadowBlur = 10;
-      ctx.strokeStyle = "#1a8cff";
+      ctx.strokeStyle = "#00d4ff";
       ctx.lineWidth = Math.max(1.5, TILE * 0.08);
       ctx.beginPath();
       roundRectPath(x, y, s, s, radius);
@@ -268,7 +280,7 @@
     if (!pacman) return;
     const r = TILE * 0.42;
     const mouth = mouthOpen ? 0.4 : 0.08;
-    let start, end, ccw = false;
+    let start, end;
 
     if (pacman.dir === "R") {
       start = mouth;
@@ -276,33 +288,24 @@
     } else if (pacman.dir === "L") {
       start = Math.PI + mouth;
       end = Math.PI - mouth;
-      ccw = true;
     } else if (pacman.dir === "U") {
       start = -Math.PI / 2 + mouth;
       end = -Math.PI / 2 - mouth;
-      ccw = true;
     } else {
       start = Math.PI / 2 + mouth;
       end = Math.PI / 2 - mouth;
-      ccw = true;
     }
 
     ctx.shadowColor = "#ffe066";
     ctx.shadowBlur = 18;
     ctx.fillStyle = "#ffe066";
     ctx.beginPath();
-    ctx.arc(pacman.x, pacman.y, r, start, end, ccw);
+    // Draw the long arc so the gap is the mouth, facing the current direction.
+    ctx.arc(pacman.x, pacman.y, r, start, end, false);
     ctx.lineTo(pacman.x, pacman.y);
     ctx.closePath();
     ctx.fill();
-
     ctx.shadowBlur = 0;
-    ctx.fillStyle = "#fff3a0";
-    ctx.beginPath();
-    ctx.arc(pacman.x, pacman.y, r * 0.55, start, end, ccw);
-    ctx.lineTo(pacman.x, pacman.y);
-    ctx.closePath();
-    ctx.fill();
   }
 
   function drawGhost(g) {
@@ -606,13 +609,11 @@
   }
 
   function resetActors() {
-    const s = score,
-      l = lives,
-      lv = level;
+    const remainingPellets = pellets;
+    const remainingPowerPellets = powerPellets;
     loadMap();
-    score = s;
-    lives = l;
-    level = lv;
+    pellets = remainingPellets;
+    powerPellets = remainingPowerPellets;
     powerMode = false;
     powerTimer = 0;
     for (const g of ghosts) {
@@ -622,7 +623,12 @@
   }
 
   function checkLevelClear() {
-    if (pellets.length === 0 && powerPellets.length === 0) {
+    if (
+      !isLevelTransitioning &&
+      pellets.length === 0 &&
+      powerPellets.length === 0
+    ) {
+      isLevelTransitioning = true;
       level++;
       score += 500 * (level - 1);
       updateHUD();
@@ -633,6 +639,7 @@
         loadMap();
         powerMode = false;
         powerTimer = 0;
+        isLevelTransitioning = false;
       }, 1400);
     }
   }
@@ -650,6 +657,12 @@
     const dt = Math.min(time - lastTime, 40);
     lastTime = time;
 
+    if (isLevelTransitioning) {
+      draw();
+      requestAnimationFrame(loop);
+      return;
+    }
+
     mouthTimer += dt;
     if (mouthTimer > 110) {
       mouthOpen = !mouthOpen;
@@ -666,8 +679,9 @@
       }
     }
 
-    const pacSpeed = (0.09 + level * 0.005) * (TILE / 28);
-    const ghostBase = (0.075 + level * 0.004) * (TILE / 28);
+    const difficulty = Math.min(level - 1, 12);
+    const pacSpeed = (0.09 + difficulty * 0.005) * (TILE / 28);
+    const ghostBase = (0.075 + difficulty * 0.004) * (TILE / 28);
     const ghostSpeed = powerMode ? ghostBase * 0.65 : ghostBase;
     const eatenSpeed = 0.14 * (TILE / 28);
 
@@ -767,6 +781,7 @@
     lives = 3;
     level = 1;
     gameOver = false;
+    isLevelTransitioning = false;
     isPlaying = true;
     powerMode = false;
     powerTimer = 0;
