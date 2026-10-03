@@ -10,7 +10,7 @@ A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaSc
 
 ## Play
 
-![play here](https://souravbanerjeedata.github.io/pacman/)
+[play here](https://souravbanerjeedata.github.io/pacman/)
 
 ---
 
