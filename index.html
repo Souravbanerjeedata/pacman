@@ -1,13 +1,98 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport", content="width=device-width, initial-scale=1.0">
-        <title>Pac-Man</title>
-        <link rel="stylesheet" href="pacman.css">
-        <script src="pacman.js"></script>
-    </head>
-    <body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta
+      name="description"
+      content="A neon-styled Pac-Man game with power pellets, tunnels, and mobile support."
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Neon Pac-Man</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="glow-orb glow-orb-1"></div>
+    <div class="glow-orb glow-orb-2"></div>
+
+    <div class="container">
+      <h1 class="title">NEON<span>&nbsp; PAC-MAN</span></h1>
+
+      <header>
+        <div class="stat score-box">
+          <span class="stat-label">SCORE</span>
+          <span class="score" id="score">0</span>
+        </div>
+        <div class="stat lives-box">
+          <span class="stat-label">LIVES</span>
+          <span class="lives" id="lives">★★★</span>
+        </div>
+        <div class="stat level-box">
+          <span class="stat-label">LEVEL</span>
+          <span class="level" id="level">1</span>
+        </div>
+      </header>
+
+      <div class="board-wrapper">
         <canvas id="board"></canvas>
-    </body>
+      </div>
+
+      <footer>
+        <div class="footer-sub desktop-only">
+          Arrow keys / WASD to move • SPACE to restart
+        </div>
+        <div class="footer-sub mobile-only">Swipe to move</div>
+      </footer>
+    </div>
+
+    <!-- Start Modal -->
+    <div class="modal" id="startModal">
+      <div class="modal-content">
+        <h2 class="modal-title">NEON<span>&nbsp;PAC-MAN</span></h2>
+        <p class="modal-text">
+          Eat all pellets. Avoid ghosts.<br />Power pellets let you eat them.
+        </p>
+        <div class="modal-buttons">
+          <button class="modal-btn start-btn" id="startBtn">START</button>
+        </div>
+        <p class="modal-hint desktop-only">Arrow keys or WASD to control</p>
+        <p class="modal-hint mobile-only">Swipe in any direction to move</p>
+      </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div class="modal hidden" id="gameOverModal">
+      <div class="modal-content">
+        <h2 class="modal-title game-over-title">GAME OVER</h2>
+        <p class="modal-score" id="finalScore">Score: 0</p>
+        <p class="modal-message" id="finalStats">Level 1</p>
+        <div class="modal-buttons">
+          <button class="modal-btn restart-modal-btn" id="restartBtn">
+            PLAY AGAIN
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Level Clear Modal (brief) -->
+    <div class="modal hidden" id="levelModal">
+      <div class="modal-content">
+        <h2 class="modal-title">LEVEL CLEAR</h2>
+        <p class="modal-text" id="levelMsg">Level 2</p>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
 </html>

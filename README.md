@@ -1,12 +1,82 @@
-# [Pacman](https://youtu.be/WxeTMsaSOaA)
-- Coding Tutorial: [https://youtu.be/WxeTMsaSOaA](https://youtu.be/WxeTMsaSOaA)
-- Demo: https://imkennyyip.github.io/pacman/
+# Neon Pac-Man
 
-In this tutorial, you will learn how to code pac-man using javascript and HTML5 canvas.
+![preview]("./preview.png")
 
-Throughout the tutorial, you will learn how to draw on the HTML5 canvas,  create the game loop,  load the game map using a tilemap, add click handlers to make the pacman move, create a simple algorithm to move each ghost at random, detect collisions between the pacman and ghosts, have pacman eat the food pellets, add a running score, reset the game when pacman collides with a ghost, and move onto the next level once pacman eats all the food pellets in the current stage. 
+A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaScript (HTML5 Canvas).
 
-![pacman-ss](https://github.com/user-attachments/assets/2bef5ecf-1254-4a0c-8872-ee6ef1459789)
+**No external image assets required** — everything is drawn on canvas.
 
-## Homework:
-You can continue working on this project if you like. You can design your own map by modifying the tileMap if you want. You can add power pellets to allow pacman to eat the ghosts. In addition, there is an opening on left and right, where if pacman goes through, it would appear on the other side of the map. Currently pacman just moves off screen out of the map so a fix would be needed to make pacman appear the other side. For more of a challenge, you can modify the ghosts movement to cover areas unreachable since the ghosts only change directions when they collide against a wall, and not when theres another path available to go through.
+---
+
+## Play
+
+Open `index.html` in any modern browser, or host the folder on GitHub Pages.
+
+---
+
+## Features
+
+- **Neon visual design** — glowing walls, pulsing power pellets, neon Pac-Man & ghosts
+- **Power pellets** — eat ghosts for bonus points (chain multiplier)
+- **Tunnel wrap** — exit left/right and appear on the other side
+- **Smart-ish ghost AI** — chase when normal, flee when scared, return home when eaten
+- **Lives system** (3) + level progression
+- **Score** — pellets, power pellets, eaten ghosts, level clear bonus
+- **Mouth animation** & scared-ghost blinking near end of power mode
+- **Mobile-friendly** — swipe to move
+- Fully responsive (tile size scales to screen)
+
+---
+
+## Controls
+
+### Desktop
+
+| Key     | Action          |
+| ------- | --------------- |
+| ← → ↑ ↓ | Move            |
+| W A S D | Move            |
+| Space   | Start / Restart |
+
+### Mobile
+
+1. Tap **START**
+2. **Swipe** in any direction to move Pac-Man
+
+---
+
+## Scoring
+
+| Action            | Points            |
+| ----------------- | ----------------- |
+| Pellet            | 10                |
+| Power pellet      | 50                |
+| 1st ghost eaten   | 200               |
+| 2nd ghost (chain) | 400               |
+| 3rd               | 800               |
+| 4th               | 1600              |
+| Level clear       | 500 × (level − 1) |
+
+Ghosts get faster and power mode gets shorter as levels increase.
+
+---
+
+## Project Structure
+
+```
+pacman/
+├── index.html   # Markup + modals
+├── style.css    # Neon theme, responsive layout
+├── app.js       # Full game logic (canvas drawing + AI)
+└── README.md
+```
+
+No build step. No dependencies. No image files.
+
+---
+
+## Author
+
+**Sourav Banerjee**
+
+GitHub: [Souravbanerjeedata](https://github.com/Souravbanerjeedata)
