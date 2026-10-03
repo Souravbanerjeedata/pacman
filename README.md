@@ -1,7 +1,5 @@
 # Neon Pac-Man
 
-![preview]("./preview.png")
-
 A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaScript (HTML5 Canvas).
 
 **No external image assets required** — everything is drawn on canvas.
@@ -72,6 +70,25 @@ pacman/
 ```
 
 No build step. No dependencies. No image files.
+
+---
+
+## Improvements over the original
+
+The original repo was a basic Kenny Yip tutorial (PNG sprites, simple random ghost movement, no power pellets, no tunnels, minimal UI).
+
+This version adds:
+
+- Full neon aesthetic matching Neon Snake / Neon Tetris
+- Pure canvas rendering (no PNG assets)
+- Power pellets + scared / eaten ghost states
+- Tunnel wrap-around
+- Better ghost AI (chase / flee / return home)
+- Lives, levels, progressive difficulty
+- Start / Game Over / Level Clear modals
+- Swipe controls for mobile
+- Responsive scaling
+- Polished HUD (score, lives, level)
 
 ---
 

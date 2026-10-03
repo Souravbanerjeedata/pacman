@@ -4,12 +4,13 @@
   // ─── Constants ───────────────────────────────────────────────
   const COLS = 19;
   const ROWS = 21;
-  let TILE = 28; // will scale to fit screen
+  let TILE = 28;
 
   // Map legend:
-  // X = wall, . = pellet, o = power pellet,   = empty
-  // P = pacman start, R/P/B/O = ghost starts (red/pink/blue/orange)
-  // T = tunnel (empty, wraps)
+  // X = wall, . = pellet, o = power pellet, space = empty corridor
+  // P = pacman, R/P/B/O = ghosts (Blinky/Pinky/Inky/Clyde)
+  // T = tunnel (wrap)
+  // Ghost house is open horizontally so ghosts can leave immediately
   const MAP = [
     "XXXXXXXXXXXXXXXXXXX",
     "X........X........X",
@@ -18,11 +19,11 @@
     "X.XX.X.XXXXX.X.XX.X",
     "X....X...X...X....X",
     "XXXX.XXX.X.XXX.XXXX",
-    "   X.X.......X.X   ",
-    "XXXX.X.XXrXX.X.XXXX",
-    "T.....Bb pO......T",
+    "   X.X       X.X   ",
+    "XXXX.X.XX XX.X.XXXX",
+    "T     R B P O     T",
     "XXXX.X.XXXXX.X.XXXX",
-    "   X.X.......X.X   ",
+    "   X.X       X.X   ",
     "XXXX.X.XXXXX.X.XXXX",
     "X........X........X",
     "X.XX.XXX.X.XXX.XX.X",
@@ -44,13 +45,13 @@
   const OPPOSITE = { U: "D", D: "U", L: "R", R: "L" };
 
   const GHOST_COLORS = {
-    R: "#ff2a6d", // Blinky – red/pink
-    P: "#ff79c6", // Pinky
-    B: "#00d4ff", // Inky – cyan
-    O: "#ff9f43", // Clyde – orange
+    R: "#ff2a6d",
+    P: "#ff79c6",
+    B: "#00d4ff",
+    O: "#ff9f43",
   };
-  const SCARED_COLOR = "#3a5cff";
-  const EYES_ONLY = "#e0e0ff";
+  const SCARED_COLOR = "#4a6bff";
+  const EYES_COLOR = "#c8d0ff";
 
   // ─── DOM ─────────────────────────────────────────────────────
   const canvas = document.getElementById("board");
@@ -81,7 +82,6 @@
   let powerMode = false;
   let powerTimer = 0;
   let ghostEatScore = 200;
-  let animFrame = 0;
   let lastTime = 0;
   let mouthOpen = true;
   let mouthTimer = 0;
@@ -119,9 +119,11 @@
         } else if (ch === "o") {
           powerPellets.push({ c, r, x, y });
         } else if (ch === "P") {
-          pacman = createActor(c, r, "R");
+          pacman = createActor(c, r, "L");
         } else if ("RPBO".includes(ch)) {
-          const g = createActor(c, r, "U");
+          // Start facing outward so they leave the house immediately
+          const startDir = c < 9 ? "L" : "R";
+          const g = createActor(c, r, startDir);
           g.type = ch;
           g.color = GHOST_COLORS[ch];
           g.scared = false;
@@ -129,28 +131,18 @@
           g.home = { c, r };
           ghosts.push(g);
         }
-        // space and T are walkable empty
       }
     }
   }
 
   function createActor(c, r, dir) {
     const { x, y } = cellCenter(c, r);
-    return {
-      c,
-      r,
-      x,
-      y,
-      dir,
-      nextDir: null,
-      speed: 0,
-    };
+    return { c, r, x, y, dir, nextDir: null };
   }
 
   function isWall(c, r) {
     if (r < 0 || r >= ROWS) return true;
-    // horizontal tunnel wrap
-    if (c < 0 || c >= COLS) return false;
+    if (c < 0 || c >= COLS) return false; // tunnel
     return MAP[r][c] === "X";
   }
 
@@ -166,154 +158,12 @@
     if (actor.c > COLS - 0.5) actor.c = -0.5;
   }
 
-  // ─── Drawing (pure canvas, neon style) ───────────────────────
-  function drawWalls() {
-    ctx.strokeStyle = "#1a6bff";
-    ctx.lineWidth = Math.max(2, TILE * 0.12);
-    ctx.shadowColor = "#1a6bff";
-    ctx.shadowBlur = 8;
-    ctx.lineJoin = "round";
+  // ─── Neon drawing ────────────────────────────────────────────
+  function drawBackground() {
+    ctx.fillStyle = "#06061a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw walls as rounded rectangles with glow
-    for (const w of walls) {
-      const pad = TILE * 0.08;
-      ctx.strokeRect(w.x + pad, w.y + pad, TILE - pad * 2, TILE - pad * 2);
-    }
-    ctx.shadowBlur = 0;
-  }
-
-  function drawPellets() {
-    ctx.fillStyle = "#ffe066";
-    ctx.shadowColor = "#ffe066";
-    ctx.shadowBlur = 4;
-    const r = Math.max(2, TILE * 0.1);
-    for (const p of pellets) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-  }
-
-  function drawPowerPellets(time) {
-    const pulse = 0.7 + 0.3 * Math.sin(time / 150);
-    const r = Math.max(4, TILE * 0.22) * pulse;
-    ctx.fillStyle = "#00ff9d";
-    ctx.shadowColor = "#00ff9d";
-    ctx.shadowBlur = 12;
-    for (const p of powerPellets) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-  }
-
-  function drawPacman() {
-    if (!pacman) return;
-    const r = TILE * 0.4;
-    let start = 0.25;
-    let end = 1.75;
-
-    // Mouth direction
-    const mouth = mouthOpen ? 0.35 : 0.05;
-    if (pacman.dir === "R") {
-      start = mouth;
-      end = Math.PI * 2 - mouth;
-    } else if (pacman.dir === "L") {
-      start = Math.PI + mouth;
-      end = Math.PI - mouth;
-    } else if (pacman.dir === "U") {
-      start = -Math.PI / 2 + mouth;
-      end = -Math.PI / 2 - mouth + Math.PI * 2;
-    } else if (pacman.dir === "D") {
-      start = Math.PI / 2 + mouth;
-      end = Math.PI / 2 - mouth;
-    }
-
-    ctx.fillStyle = "#ffe066";
-    ctx.shadowColor = "#ffe066";
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.arc(pacman.x, pacman.y, r, start, end, false);
-    ctx.lineTo(pacman.x, pacman.y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-
-  function drawGhost(g) {
-    const r = TILE * 0.4;
-    const bodyH = r * 1.15;
-    let color = g.color;
-    if (g.eaten) color = EYES_ONLY;
-    else if (g.scared) {
-      // blink near end of power mode
-      if (powerTimer < 2000 && Math.floor(powerTimer / 200) % 2 === 0) {
-        color = "#fff";
-      } else {
-        color = SCARED_COLOR;
-      }
-    }
-
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = g.eaten ? 0 : 12;
-
-    // Body (semi-circle + wavy bottom)
-    ctx.beginPath();
-    ctx.arc(g.x, g.y - r * 0.15, r, Math.PI, 0, false);
-    const waves = 3;
-    const waveW = (r * 2) / waves;
-    for (let i = 0; i <= waves; i++) {
-      const wx = g.x - r + i * waveW;
-      const wy = g.y + bodyH * 0.55 + (i % 2 === 0 ? 0 : TILE * 0.08);
-      if (i === 0) ctx.lineTo(wx, wy);
-      else ctx.lineTo(wx, wy);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Eyes
-    const eyeR = r * 0.22;
-    const eyeOffsetX = r * 0.28;
-    const eyeY = g.y - r * 0.25;
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(g.x - eyeOffsetX, eyeY, eyeR, 0, Math.PI * 2);
-    ctx.arc(g.x + eyeOffsetX, eyeY, eyeR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pupils (look toward pacman or direction)
-    if (!g.scared || g.eaten) {
-      const pupilR = eyeR * 0.5;
-      let px = 0,
-        py = 0;
-      if (g.dir === "L") px = -pupilR * 0.6;
-      if (g.dir === "R") px = pupilR * 0.6;
-      if (g.dir === "U") py = -pupilR * 0.6;
-      if (g.dir === "D") py = pupilR * 0.6;
-      ctx.fillStyle = "#1a1a2e";
-      ctx.beginPath();
-      ctx.arc(g.x - eyeOffsetX + px, eyeY + py, pupilR, 0, Math.PI * 2);
-      ctx.arc(g.x + eyeOffsetX + px, eyeY + py, pupilR, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // scared eyes – simple dots
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.arc(g.x - eyeOffsetX, eyeY, eyeR * 0.35, 0, Math.PI * 2);
-      ctx.arc(g.x + eyeOffsetX, eyeY, eyeR * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // subtle grid
-    ctx.strokeStyle = "rgba(0, 255, 157, 0.03)";
+    ctx.strokeStyle = "rgba(0, 212, 255, 0.04)";
     ctx.lineWidth = 1;
     for (let c = 0; c <= COLS; c++) {
       ctx.beginPath();
@@ -327,7 +177,237 @@
       ctx.lineTo(canvas.width, r * TILE);
       ctx.stroke();
     }
+  }
 
+  function roundRectPath(x, y, w, h, rad) {
+    const r = Math.min(rad, w / 2, h / 2);
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawWalls() {
+    const pad = TILE * 0.12;
+    const radius = TILE * 0.18;
+
+    for (const w of walls) {
+      const x = w.x + pad;
+      const y = w.y + pad;
+      const s = TILE - pad * 2;
+
+      // Glow stroke
+      ctx.shadowColor = "#00d4ff";
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = "#1a8cff";
+      ctx.lineWidth = Math.max(1.5, TILE * 0.08);
+      ctx.beginPath();
+      roundRectPath(x, y, s, s, radius);
+      ctx.stroke();
+
+      // Fill
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(10, 30, 70, 0.65)";
+      ctx.beginPath();
+      roundRectPath(x, y, s, s, radius);
+      ctx.fill();
+
+      // Inner edge highlight
+      ctx.strokeStyle = "rgba(120, 200, 255, 0.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      roundRectPath(x + 1.5, y + 1.5, s - 3, s - 3, Math.max(0, radius - 1));
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawPellets() {
+    const r = Math.max(2, TILE * 0.12);
+    ctx.shadowColor = "#ffe066";
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = "#ffe066";
+    for (const p of pellets) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawPowerPellets(time) {
+    const pulse = 0.65 + 0.35 * Math.sin(time / 140);
+    const r = Math.max(5, TILE * 0.28) * pulse;
+
+    for (const p of powerPellets) {
+      ctx.shadowColor = "#00ff9d";
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = "rgba(0, 255, 157, 0.3)";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#00ff9d";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.beginPath();
+      ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function drawPacman() {
+    if (!pacman) return;
+    const r = TILE * 0.42;
+    const mouth = mouthOpen ? 0.4 : 0.08;
+    let start, end, ccw = false;
+
+    if (pacman.dir === "R") {
+      start = mouth;
+      end = Math.PI * 2 - mouth;
+    } else if (pacman.dir === "L") {
+      start = Math.PI + mouth;
+      end = Math.PI - mouth;
+      ccw = true;
+    } else if (pacman.dir === "U") {
+      start = -Math.PI / 2 + mouth;
+      end = -Math.PI / 2 - mouth;
+      ccw = true;
+    } else {
+      start = Math.PI / 2 + mouth;
+      end = Math.PI / 2 - mouth;
+      ccw = true;
+    }
+
+    ctx.shadowColor = "#ffe066";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "#ffe066";
+    ctx.beginPath();
+    ctx.arc(pacman.x, pacman.y, r, start, end, ccw);
+    ctx.lineTo(pacman.x, pacman.y);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff3a0";
+    ctx.beginPath();
+    ctx.arc(pacman.x, pacman.y, r * 0.55, start, end, ccw);
+    ctx.lineTo(pacman.x, pacman.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawGhost(g) {
+    const r = TILE * 0.4;
+    let color = g.color;
+
+    if (g.eaten) {
+      color = EYES_COLOR;
+    } else if (g.scared) {
+      color =
+        powerTimer < 2200 && Math.floor(powerTimer / 180) % 2 === 0
+          ? "#ffffff"
+          : SCARED_COLOR;
+    }
+
+    ctx.shadowColor = g.eaten ? "transparent" : color;
+    ctx.shadowBlur = g.eaten ? 0 : 14;
+    ctx.fillStyle = color;
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(g.x, g.y - r * 0.1, r, Math.PI, 0, false);
+    const waves = 4;
+    const waveW = (r * 2) / waves;
+    const baseY = g.y + r * 0.7;
+    for (let i = 0; i <= waves; i++) {
+      const wx = g.x - r + i * waveW;
+      const wy = baseY + (i % 2 === 0 ? 0 : TILE * 0.1);
+      ctx.lineTo(wx, wy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    if (g.eaten) {
+      drawEyes(g, r, true);
+      return;
+    }
+
+    // Body highlight
+    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.beginPath();
+    ctx.ellipse(
+      g.x - r * 0.2,
+      g.y - r * 0.35,
+      r * 0.35,
+      r * 0.25,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    drawEyes(g, r, false);
+  }
+
+  function drawEyes(g, r, pupilsOnly) {
+    const eyeR = r * 0.24;
+    const eyeOffsetX = r * 0.3;
+    const eyeY = g.y - r * 0.22;
+
+    if (!pupilsOnly) {
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(g.x - eyeOffsetX, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.arc(g.x + eyeOffsetX, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (g.scared && !g.eaten) {
+      ctx.fillStyle = "#1a1a2e";
+      ctx.beginPath();
+      ctx.arc(g.x - eyeOffsetX, eyeY, eyeR * 0.4, 0, Math.PI * 2);
+      ctx.arc(g.x + eyeOffsetX, eyeY, eyeR * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // Wavy mouth
+      ctx.strokeStyle = "#1a1a2e";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const my = g.y + r * 0.25;
+      ctx.moveTo(g.x - r * 0.35, my);
+      for (let i = 0; i < 4; i++) {
+        const mx = g.x - r * 0.35 + ((i + 1) * (r * 0.7)) / 4;
+        ctx.lineTo(mx, my + (i % 2 === 0 ? 3 : -3));
+      }
+      ctx.stroke();
+    } else {
+      const pupilR = eyeR * 0.5;
+      let px = 0,
+        py = 0;
+      if (g.dir === "L") px = -pupilR * 0.7;
+      if (g.dir === "R") px = pupilR * 0.7;
+      if (g.dir === "U") py = -pupilR * 0.7;
+      if (g.dir === "D") py = pupilR * 0.7;
+
+      ctx.fillStyle = "#1a1a2e";
+      ctx.beginPath();
+      ctx.arc(g.x - eyeOffsetX + px, eyeY + py, pupilR, 0, Math.PI * 2);
+      ctx.arc(g.x + eyeOffsetX + px, eyeY + py, pupilR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function draw() {
+    drawBackground();
     drawWalls();
     drawPellets();
     drawPowerPellets(performance.now());
@@ -338,11 +418,10 @@
   // ─── Movement ────────────────────────────────────────────────
   function tryTurn(actor, dir) {
     if (!dir || !canMove(actor, dir)) return false;
-    // only turn when roughly centered on a tile
     const cx = Math.round(actor.c);
     const cy = Math.round(actor.r);
     const dist = Math.abs(actor.c - cx) + Math.abs(actor.r - cy);
-    if (dist > 0.15) return false;
+    if (dist > 0.2) return false;
     actor.c = cx;
     actor.r = cy;
     actor.dir = dir;
@@ -354,85 +433,95 @@
     if (actor.nextDir) tryTurn(actor, actor.nextDir);
 
     const d = DIRS[actor.dir];
-    const step = speed * (dt / 16.67);
+    if (!d) return;
 
-    // check if next step would hit wall
-    const testC = actor.c + d.x * step;
-    const testR = actor.r + d.y * step;
-    const checkC = d.x !== 0 ? Math.round(testC + d.x * 0.4) : Math.round(actor.c);
-    const checkR = d.y !== 0 ? Math.round(testR + d.y * 0.4) : Math.round(actor.r);
+    const step = speed * (dt / 16.67);
+    const look = 0.45;
+    const checkC =
+      d.x !== 0 ? Math.round(actor.c + d.x * look) : Math.round(actor.c);
+    const checkR =
+      d.y !== 0 ? Math.round(actor.r + d.y * look) : Math.round(actor.r);
 
     if (isWall(checkC, checkR)) {
-      // snap to center
       actor.c = Math.round(actor.c);
       actor.r = Math.round(actor.r);
+      actor.x = actor.c * TILE + TILE / 2;
+      actor.y = actor.r * TILE + TILE / 2;
       return;
     }
 
-    actor.c = testC;
-    actor.r = testR;
+    actor.c += d.x * step;
+    actor.r += d.y * step;
     wrap(actor);
     actor.x = actor.c * TILE + TILE / 2;
     actor.y = actor.r * TILE + TILE / 2;
   }
 
+  function getValidDirs(g, allowReverse) {
+    return DIR_KEYS.filter((d) => {
+      if (!allowReverse && d === OPPOSITE[g.dir]) return false;
+      return canMove(g, d);
+    });
+  }
+
   function ghostAI(g) {
-    // If eaten, go home
+    const cx = Math.round(g.c);
+    const cy = Math.round(g.r);
+    const dist = Math.abs(g.c - cx) + Math.abs(g.r - cy);
+    if (dist > 0.15) return;
+
+    // Eaten → go home
     if (g.eaten) {
-      const hc = g.home.c;
-      const hr = g.home.r;
-      if (Math.abs(g.c - hc) < 0.3 && Math.abs(g.r - hr) < 0.3) {
+      if (Math.abs(g.c - g.home.c) < 0.4 && Math.abs(g.r - g.home.r) < 0.4) {
         g.eaten = false;
         g.scared = powerMode;
+        g.dir = g.c < 9 ? "L" : "R";
+        g.nextDir = null;
         return;
       }
-      // simple path toward home
-      const options = DIR_KEYS.filter((d) => d !== OPPOSITE[g.dir] && canMove(g, d));
-      if (options.length === 0) return;
+      const options = getValidDirs(g, true);
+      if (!options.length) return;
       let best = options[0];
       let bestDist = Infinity;
       for (const d of options) {
-        const nc = Math.round(g.c) + DIRS[d].x;
-        const nr = Math.round(g.r) + DIRS[d].y;
-        const dist = Math.abs(nc - hc) + Math.abs(nr - hr);
-        if (dist < bestDist) {
-          bestDist = dist;
+        const nc = cx + DIRS[d].x;
+        const nr = cy + DIRS[d].y;
+        const dd = Math.abs(nc - g.home.c) + Math.abs(nr - g.home.r);
+        if (dd < bestDist) {
+          bestDist = dd;
           best = d;
         }
       }
       g.nextDir = best;
+      tryTurn(g, best);
       return;
     }
 
-    // At decision points (intersection), pick a direction
-    const options = DIR_KEYS.filter((d) => d !== OPPOSITE[g.dir] && canMove(g, d));
-    if (options.length <= 1) {
-      if (options.length === 1) g.nextDir = options[0];
+    let options = getValidDirs(g, false);
+    if (!options.length) options = getValidDirs(g, true);
+    if (!options.length) return;
+
+    if (options.length === 1) {
+      g.nextDir = options[0];
+      tryTurn(g, options[0]);
       return;
     }
-
-    // Centered enough to decide?
-    const cx = Math.round(g.c);
-    const cy = Math.round(g.r);
-    if (Math.abs(g.c - cx) + Math.abs(g.r - cy) > 0.12) return;
 
     if (g.scared) {
-      // run away from pacman
       let best = options[0];
       let bestDist = -1;
       for (const d of options) {
         const nc = cx + DIRS[d].x;
         const nr = cy + DIRS[d].y;
-        const dist = Math.abs(nc - pacman.c) + Math.abs(nr - pacman.r);
-        if (dist > bestDist) {
-          bestDist = dist;
+        const dd = Math.abs(nc - pacman.c) + Math.abs(nr - pacman.r);
+        if (dd > bestDist) {
+          bestDist = dd;
           best = d;
         }
       }
       g.nextDir = best;
     } else {
-      // chase pacman with some randomness
-      if (Math.random() < 0.25) {
+      if (Math.random() < 0.3) {
         g.nextDir = options[Math.floor(Math.random() * options.length)];
       } else {
         let best = options[0];
@@ -440,35 +529,33 @@
         for (const d of options) {
           const nc = cx + DIRS[d].x;
           const nr = cy + DIRS[d].y;
-          const dist = Math.abs(nc - pacman.c) + Math.abs(nr - pacman.r);
-          if (dist < bestDist) {
-            bestDist = dist;
+          const dd = Math.abs(nc - pacman.c) + Math.abs(nr - pacman.r);
+          if (dd < bestDist) {
+            bestDist = dd;
             best = d;
           }
         }
         g.nextDir = best;
       }
     }
+    tryTurn(g, g.nextDir);
   }
 
-  // ─── Collisions & game logic ─────────────────────────────────
+  // ─── Collisions ──────────────────────────────────────────────
   function checkPellet() {
     const pc = Math.round(pacman.c);
     const pr = Math.round(pacman.r);
 
     for (let i = pellets.length - 1; i >= 0; i--) {
-      const p = pellets[i];
-      if (p.c === pc && p.r === pr) {
+      if (pellets[i].c === pc && pellets[i].r === pr) {
         pellets.splice(i, 1);
         score += 10;
         updateHUD();
         return;
       }
     }
-
     for (let i = powerPellets.length - 1; i >= 0; i--) {
-      const p = powerPellets[i];
-      if (p.c === pc && p.r === pr) {
+      if (powerPellets[i].c === pc && powerPellets[i].r === pr) {
         powerPellets.splice(i, 1);
         score += 50;
         activatePower();
@@ -480,12 +567,11 @@
 
   function activatePower() {
     powerMode = true;
-    powerTimer = 8000 - Math.min(level - 1, 5) * 500; // shorter on higher levels
+    powerTimer = Math.max(4000, 8000 - (level - 1) * 600);
     ghostEatScore = 200;
     for (const g of ghosts) {
       if (!g.eaten) {
         g.scared = true;
-        // reverse direction
         g.dir = OPPOSITE[g.dir] || g.dir;
         g.nextDir = null;
       }
@@ -494,17 +580,14 @@
 
   function checkGhostCollision() {
     for (const g of ghosts) {
-      const dist = Math.hypot(g.x - pacman.x, g.y - pacman.y);
-      if (dist < TILE * 0.55) {
+      if (Math.hypot(g.x - pacman.x, g.y - pacman.y) < TILE * 0.55) {
         if (g.scared && !g.eaten) {
-          // eat ghost
           g.eaten = true;
           g.scared = false;
           score += ghostEatScore;
-          ghostEatScore *= 2;
+          ghostEatScore = Math.min(ghostEatScore * 2, 1600);
           updateHUD();
         } else if (!g.eaten && !g.scared) {
-          // die
           loseLife();
           return;
         }
@@ -519,19 +602,17 @@
       endGame();
       return;
     }
-    // reset positions
     resetActors();
   }
 
   function resetActors() {
-    // rebuild from map positions
-    const savedScore = score;
-    const savedLives = lives;
-    const savedLevel = level;
+    const s = score,
+      l = lives,
+      lv = level;
     loadMap();
-    score = savedScore;
-    lives = savedLives;
-    level = savedLevel;
+    score = s;
+    lives = l;
+    level = lv;
     powerMode = false;
     powerTimer = 0;
     for (const g of ghosts) {
@@ -545,19 +626,15 @@
       level++;
       score += 500 * (level - 1);
       updateHUD();
-      showLevelClear();
+      levelMsgEl.textContent = `Level ${level}`;
+      levelModal.classList.remove("hidden");
       setTimeout(() => {
         levelModal.classList.add("hidden");
         loadMap();
         powerMode = false;
         powerTimer = 0;
-      }, 1500);
+      }, 1400);
     }
-  }
-
-  function showLevelClear() {
-    levelMsgEl.textContent = `Level ${level}`;
-    levelModal.classList.remove("hidden");
   }
 
   function updateHUD() {
@@ -570,17 +647,15 @@
   function loop(time) {
     if (!isPlaying || gameOver) return;
 
-    const dt = Math.min(time - lastTime, 50);
+    const dt = Math.min(time - lastTime, 40);
     lastTime = time;
 
-    // Mouth animation
     mouthTimer += dt;
-    if (mouthTimer > 120) {
+    if (mouthTimer > 110) {
       mouthOpen = !mouthOpen;
       mouthTimer = 0;
     }
 
-    // Power mode timer
     if (powerMode) {
       powerTimer -= dt;
       if (powerTimer <= 0) {
@@ -591,12 +666,10 @@
       }
     }
 
-    // Speeds
-    const pacSpeed = (0.085 + level * 0.004) * (TILE / 28);
-    const ghostSpeed = powerMode
-      ? (0.05 + level * 0.002) * (TILE / 28)
-      : (0.07 + level * 0.0035) * (TILE / 28);
-    const eatenSpeed = 0.12 * (TILE / 28);
+    const pacSpeed = (0.09 + level * 0.005) * (TILE / 28);
+    const ghostBase = (0.075 + level * 0.004) * (TILE / 28);
+    const ghostSpeed = powerMode ? ghostBase * 0.65 : ghostBase;
+    const eatenSpeed = 0.14 * (TILE / 28);
 
     moveActor(pacman, pacSpeed, dt);
     checkPellet();
@@ -605,8 +678,7 @@
 
     for (const g of ghosts) {
       ghostAI(g);
-      const spd = g.eaten ? eatenSpeed : ghostSpeed;
-      moveActor(g, spd, dt);
+      moveActor(g, g.eaten ? eatenSpeed : ghostSpeed, dt);
     }
 
     draw();
@@ -617,13 +689,28 @@
   function setDir(dir) {
     if (!isPlaying || gameOver || !pacman) return;
     pacman.nextDir = dir;
-    // allow instant turn if possible
     tryTurn(pacman, dir);
   }
 
   document.addEventListener("keydown", (e) => {
     const key = e.key;
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "w", "a", "s", "d", "W", "A", "S", "D"].includes(key)) {
+    if (
+      [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        " ",
+        "w",
+        "a",
+        "s",
+        "d",
+        "W",
+        "A",
+        "S",
+        "D",
+      ].includes(key)
+    ) {
       e.preventDefault();
     }
 
@@ -638,7 +725,6 @@
     else if (key === "ArrowRight" || key === "d" || key === "D") setDir("R");
   });
 
-  // Swipe
   let touchX = 0,
     touchY = 0;
   document.addEventListener(
@@ -659,10 +745,8 @@
       const t = e.changedTouches[0];
       const dx = t.clientX - touchX;
       const dy = t.clientY - touchY;
-      const absX = Math.abs(dx);
-      const absY = Math.abs(dy);
-      if (Math.max(absX, absY) < 25) return;
-      if (absX > absY) setDir(dx > 0 ? "R" : "L");
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 25) return;
+      if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? "R" : "L");
       else setDir(dy > 0 ? "D" : "U");
     },
     { passive: true }
@@ -708,13 +792,12 @@
   startBtn.addEventListener("click", startGame);
   restartBtn.addEventListener("click", startGame);
 
-  // Initial setup – show empty board under modal
   scaleTile();
   loadMap();
   draw();
+
   window.addEventListener("resize", () => {
     scaleTile();
-    // re-sync pixel positions
     if (pacman) {
       pacman.x = pacman.c * TILE + TILE / 2;
       pacman.y = pacman.r * TILE + TILE / 2;
