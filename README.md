@@ -1,6 +1,6 @@
 # Neon Pac-Man
 
-![preview]("./preview.png")
+![preview](./preview.png)
 
 A modern, neon-styled Pac-Man game built with pure HTML, CSS, and vanilla JavaScript (HTML5 Canvas).
 
